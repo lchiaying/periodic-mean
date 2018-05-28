@@ -26,19 +26,38 @@ $$ d(x,z) = \min \{ |(x-\pi) - z| , |x-z| , |(x+\pi) - z| \}. $$
 
 For a fixed $x$ (which will play the role of a data point later on), the squared distance as a function of $z$ (which will play the role of the minimization variable) is the pointwise minimum of three quadratic functions. This is shown in the following figure.
 
-```{r, echo=F, cache=T, fig.width=5, fig.height=3, fig.align='center'}
-x = -pi/4
-dt = data.table(z = seq(-6, 5, len = 401)) %>%
+```{r, echo=F, cache=T, fig.width=8, fig.height=3, fig.align='center'}
+x = 3*pi/16
+dt = data.table(z = seq(-3*pi/2, 2*pi, len = 401)) %>%
     .[, `d-sq` := pmin((x-pi-z)^2, (x-z)^2, (x+pi-z)^2)]
 
 ggplot(dt, aes(z, `d-sq`)) +
-    geom_line() +
-    scale_x_continuous(limits = c(-6, 6)) +
-    ggtitle("Plot of squared distance from z to the point x = -pi/4")
+    annotate("rect", fill="grey80", alpha=0.5, xmin=-pi/2, xmax=pi/2, ymin=0, ymax=dt[, max(`d-sq`)+0.3]) +
+    geom_line(color="blue") +
+    scale_x_continuous(name = expression(z),
+                       labels = c(expression(paste("-2", pi)), 
+                                  expression(paste("-3", pi, "/2")), 
+                                  expression(paste("-", pi)),
+                                  expression(paste("-", pi, "/2")),
+                                  expression(paste("x-", pi, "/2")),
+                                  expression(0), 
+                                  expression(x),
+                                  expression(paste(pi, "/2")),
+                                  expression(paste("x+", pi, "/2")),
+                                  expression(pi),
+                                  expression(paste("3", pi, "/2")),
+                                  expression(paste("2", pi))),
+                       breaks = sort(c((-4:4) * pi/2,  x + (-1:1) * pi/2)),
+                       minor_breaks = c()# x + (-1:1) * pi/2
+                       ) +
+    scale_y_continuous(name = expression(d(x,z)^2)) +
+    geom_vline(xintercept = x + c(-1,1)*pi/2, color="gray10", linetype="dotted") +
+    ggtitle(expression(paste("Plot of squared distance to the point x = 3", pi, "/16")))
 ```
 
+In the figure, the squared distance (blue curve) is continuous and piecewise quadratic, with minima at $x$ and $x \pm \pi$. But it is not differentiable at the points $x \pm \pi/2$ (dotted lines). Due to periodicity, $z$ is restricted to lie in the domain $[-\pi/2, \pi/2]$ (grey box). For different values of $x$, you can imagine translating the blue curve left and right along with $x$.
 
-Consequently, we can rewrite the (squared) distance in terms of three cases.
+Consequently, we can rewrite the squared distance in terms of three cases.
 
 $$
 \begin{equation}
