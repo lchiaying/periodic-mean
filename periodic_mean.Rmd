@@ -77,7 +77,7 @@ Then, following the same idea as for non-periodic domains, the mean $\mu$ is the
 
 $$ \mu = \arg\min_{z\in\mathcal{D}} \Phi(z) := \arg\min_{z\in\mathcal{D}} \left\{ \frac{1}{2} \sum_{i=1}^N d(x_i, z)^2 \right\} .$$
 
-Unfortunately, this minimization is no longer convex, and the objective is not differentiable at a finite number of points. However, we can make use of the fact that the objective is continuous and piecewise quadratic on $\mathcal{O}(N)$ intervals to compute the minimizer.
+Unfortunately, this minimization is no longer convex, and the objective is not differentiable at a finite number of points. However, we can make use of the fact that the objective is continuous and piecewise quadratic on $N+1$ intervals to compute the minimizer exactly.
 
 To do so, assume wlog that $x_i$ are sorted, and for ease of presentation, we also rename the data points $x_1 < \dots < x_n \leq 0$ and $0 < x'_{1} < \dots < x'_{N-n}$. Then the breakpoints of the piecewise quardratic $\Phi$, restricted to domain $\mathcal{D}$, are the (sorted) points
 $x'_1 - \pi/2, \dots, x'_{N-n} - \pi/2, x_1 + \pi/2, \dots, x_n + \pi/2$.
@@ -208,7 +208,7 @@ periodic_mean <- function(data, dom = pi/2) {
 
 Let's test the `periodic_mean` function on some generated data. We randomly generate 2-dimensional Normal data centered at $(\pi/2, \pi/2)$, and then take it modulo $\pi$ to put it onto the periodic domain. For testing purposes, we choose the standard deviation small enough so that, intuitively, the mean of the periodic data equals the mean of the original Normal data modulo $\pi$.
 
-```{r}
+```{r, cache=T}
 dom = pi/2 # Domain half size
 N = 50     # Number of data points
 
@@ -227,7 +227,7 @@ mu_target = ((mu_original+dom) %% (2*dom)) - dom
 
 The following figure illustrates the generated data and the periodic vs non-periodic mean. The original Normal data (blue circles) and the periodic data modulo $\pi$ (red triangles) should intuitively have the same mean modulo $\pi$ (dark blue solid dots, which are equivalent mod $\pi$). Ignoring the periodicity of the data when computing the mean leads to the dark red solid triangle.
 
-```{r, echo=F}
+```{r, echo=F, cache=T}
 # Plot data
 par(pty='s')
 plot(x, xlim = c(-dom, max(x)), ylim = c(-dom, max(x)), col="blue", pch=1, asp=1,
@@ -241,13 +241,67 @@ lines(c(-dom, -dom, dom, dom, -dom), c(-dom, dom, dom, -dom, -dom), col="gray80"
 
 We now test that the `periodic_mean` function finds the correct mean.
 
-```{r}
+```{r, cache=T}
 mu_per = apply(data, 2, periodic_mean)
 mu_per
 mu_target
 ```
 
 Check!
+
+Just for fun, this is how the $L^2$ objective function looks for each dimension of the above data. The vertical black line shows the location of the minimum.
+
+```{r, echo=F, cache=T, fig.width=8, fig.height=4, fig.align='center'}
+getObjective <- function(data, zgrid) {
+    data <- sort(data)
+    
+    N = length(data)
+    n = which(data > 0)[1] - 1
+    
+    breakpoints = c(-dom, data[(n+1):N] - dom, data[1:n] + dom, dom)
+    
+    ## Helper functions
+    dsq = function(x,y) {(x - y)^2}
+    
+    # L2 Minimization Objective
+    Phi = function(z, k = which(z<=breakpoints)[1]-1) {
+        if (k==1) {
+            0.5 * (  sum( dsq( data[(n+1) : N] - 2*dom , z ) ) + 
+                         sum( dsq( data[   1  : n]         , z ) )    )
+        } else if (k <= N-n) {
+            0.5 * (  sum( dsq( data[(n+1) : (n+k-1)]         , z ) ) + 
+                         sum( dsq( data[(n+k) :      N ] - 2*dom , z ) ) +
+                         sum( dsq( data[   1  :      n ]         , z ) )    )
+        } else if (k == N - n + 1) {
+            0.5 * (  sum( dsq( data , z ) )  )
+        } else if (k <= N) {
+            0.5 * (  sum( dsq( data[  (n+1) :      N   ]         , z ) ) + 
+                         sum( dsq( data[     1  : (k-1-N+n)] + 2*dom , z ) ) +
+                         sum( dsq( data[(k-N+n) :      n   ]         , z ) )    )
+        } else {
+            0.5 * (  sum( dsq( data[(n+1) : N]         , z ) ) + 
+                         sum( dsq( data[   1  : n] + 2*dom , z ) )    )
+        }
+    }
+    
+    sapply(zgrid, Phi)
+}
+
+z = seq(-dom, dom, len=1001)[-1]
+phi = apply(data, 2, getObjective, zgrid=z)
+
+par(mfrow=c(1,2), mar=c(5,5,3,1))
+plot(z, phi[,1], type='l', col='blue',
+     ylab = expression(paste(L^2, " objective")),
+     main="1st Dimension")
+abline(v = mu_per[1], lty=2)
+
+plot(z, phi[,2], type='l', col='blue', 
+     ylab = expression(paste(L^2, " objective")),
+     main="2nd Dimension")
+abline(v = mu_per[2], lty=2)
+
+```
 
 
 ## Standard Deviation of Periodic Data
