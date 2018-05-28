@@ -183,24 +183,20 @@ periodic_mean <- function(data, dom = pi/2) {
         }
     }
 
-    ## Minimize
-    bestz = breakpoints[1]
-    bestphi = Phi(bestz, 1)
+    ## Minimize the L2 objective
+    zstars = mu0 - pi * (N - n - (0:N)) / N
+    kstars = which(breakpoints[-length(breakpoints)] < zstars & 
+                                                       zstars < breakpoints[-1])
     
-    for (k in 1:(N+1)) {
-        zs = breakpoints[k:(k+1)]
-        zstar = mu0 - pi * (N-n-(k-1)) / N
-        if (zstar < breakpoints[k+1] & zstar > breakpoints[k])
-            zs = c(zs, zstar)
-        
-        phis = sapply(zs, Phi, k = k)
-        
-        p = which.min(phis)
-        if (phis[p] < bestphi) {
-            bestz = zs[p]
-            bestphi = phis[p]
-        }
-    }
+    # The candidates are the breakpoints and valid zstars
+    zs = c(breakpoints[-1], zstars[kstars])
+    ks = c(1:(N+1), kstars)
+    
+    phis = mapply(Phi, zs, ks)
+    
+    p = which.min(phis)
+    bestz = zs[p]
+    bestphi = phis[p]
     
     return(bestz)
 }
