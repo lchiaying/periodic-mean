@@ -1,0 +1,272 @@
+---
+title: "Mean of Periodic Data"
+author: "Chia Ying Lee"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(data.table)
+library(magrittr)
+```
+
+
+Most data we encounter are real-valued on a bounded or unbounded domain. However, sometimes, we may get data on a *periodic* domain. One example of such periodic data is the angle of a needle to a horizontal line: when close to vertical, the needle's angle is either close to $\pi/2$ or $-\pi/2.$ Therefore, the angle is on the periodic domain $[-\pi/2, \pi2]$, with $-\pi/2$ identified with $\pi/2$.
+
+The usual statistics---mean and variance---don't apply directly to periodic data. Imagine a number of needles that are all close to vertical: some of their angles are close to $\pi/2$ while others are close to $-\pi/2$. Directly averaging their angles, ignoring the periodicity, will give a mean close to 0 and an erroneously large variance. The correct mean computation must account for the periodicity.
+
+## Mean of Periodic Data
+
+Harnessing the intuition of the needle example, we'll consider the periodic domain $\mathcal{D} = [-\pi/2, \pi/2]$, but the analysis applies to any 1D periodic domain, of course.
+
+The distance between two points on the periodic domain $\mathcal{D}$ is
+
+$$ d(x,z) = \min \{ |(x-\pi) - z| , |x-z| , |(x+\pi) - z| \}. $$
+
+For a fixed $x$ (which will play the role of a data point later on), the squared distance as a function of $z$ (which will play the role of the minimization variable) is the pointwise minimum of three quadratic functions. This is shown in the following figure.
+
+```{r, echo=F, cache=T, fig.width=5, fig.height=3, fig.align='center'}
+x = -pi/4
+dt = data.table(z = seq(-6, 5, len = 401)) %>%
+    .[, `d-sq` := pmin((x-pi-z)^2, (x-z)^2, (x+pi-z)^2)]
+
+ggplot(dt, aes(z, `d-sq`)) +
+    geom_line() +
+    scale_x_continuous(limits = c(-6, 6)) +
+    ggtitle("Plot of squared distance from z to the point x = -pi/4")
+```
+
+
+Consequently, we can rewrite the (squared) distance in terms of three cases.
+
+$$
+\begin{equation}
+d(x, z)^2 = 
+\begin{cases}
+((x - \pi) - z)^2   & \quad \text{if } z \leq x - \pi/2 &\ \text{(Case I)}\\
+(x - z)^2           & \quad \text{if } x - \pi/2 \leq z \leq x + \pi/2 &\  \text{(Case II)}\\
+((x + \pi) - z)^2   & \quad \text{if } z \geq x + \pi/2  &\ \text{(Case III)}
+\end{cases}
+\label{dsquare1}
+\tag{1}
+\end{equation}
+$$
+
+
+Then, following the same idea as for non-periodic domains, the mean $\mu$ is the point that minimizes the squared $L^2$ distance to the data, $x_1, \dots, x_N \in \mathcal{D}$,
+
+$$ \mu = \arg\min_{z\in\mathcal{D}} \Phi(z) := \arg\min_{z\in\mathcal{D}} \left\{ \frac{1}{2} \sum_{i=1}^N d(x_i, z)^2 \right\} .$$
+
+Unfortunately, this minimization is no longer convex, and the objective is not differentiable at a finite number of points. However, we can make use of the fact that the objective is continuous and piecewise quadratic on $\mathcal{O}(N)$ intervals to compute the minimizer.
+
+To do so, assume wlog that $x_i$ are sorted, and for ease of presentation, we also rename the data points $x_1 < \dots < x_n \leq 0$ and $0 < x'_{1} < \dots < x'_{N-n}$. Then the breakpoints of the piecewise quardratic $\Phi$, restricted to domain $\mathcal{D}$, are the (sorted) points
+$x'_1 - \pi/2, \dots, x'_{N-n} - \pi/2, x_1 + \pi/2, \dots, x_n + \pi/2$.
+So, if we can find the quadratic equation for $z$ on each interval, we will be able to find the minimum square $L^2$ distance.
+
+For $z$ on the leftmost interval, $-\pi/2 < z \leq x'_1 - \pi/2$, from Eq. (1), $d(x'_i, z)^2$ is in Case I for all $x'_i$, and in Case II for all $x_i$. Therefore, 
+
+$$\Phi(z) =
+\frac{1}{2} \sum_{i=1}^{N-n} (x'_i - \pi - z)^2 + 
+\frac{1}{2} \sum_{i=1}^{n} (x_i-z)^2 
+\qquad \text{ for } -\pi/2 < z \leq x'_1 - \pi/2 .$$
+
+Next, for $k = 2, \dots, N-n$, when $x'_{k-1} - \pi/2 \leq z \leq x'_{k} - \pi/2$, we now have $d(x'_i, z)^2$ is in Case II for $i = 1, \dots, k-1$ and Case I for $i = k, \dots, N-n$, and $d(x_i, z)^2$ is in Case II for all $x_i$. Therefore,
+
+$$\Phi(z) = 
+\frac{1}{2} \sum_{i=1}^{k-1} (x'_i - z)^2 + 
+\frac{1}{2} \sum_{i=k}^{N-n} (x'_i - \pi - z)^2 + 
+\frac{1}{2} \sum_{i=1}^{n} (x_i - z)^2 
+\qquad \text{ for } x'_{k-1} - \pi/2 \leq z \leq x'_{k} - \pi/2.$$
+
+By a similar analysis, for $z$ on each of the remaining intervals,
+
+$$\Phi(z) = 
+\frac{1}{2} \sum_{i=1}^{N-n} (x'_i - z)^2 + 
+\frac{1}{2} \sum_{i=1}^{n} (x_i - z)^2 
+\qquad \text{ for } x'_{N-n} - \pi/2 \leq z \leq x_{1} + \pi/2.$$
+
+and 
+
+$$\Phi(z) = 
+\frac{1}{2} \sum_{i=1}^{N-n} (x'_i - z)^2 +
+\frac{1}{2} \sum_{i=1}^{k-1} (x_i + \pi - z)^2 +
+\frac{1}{2} \sum_{i=k}^{n} (x_i - z)^2
+\qquad \text{ for } x_{k-1} + \pi/2 \leq z \leq x_{k} + \pi/2,\ k = 2, \dots, n.$$
+
+and
+
+$$\Phi(z) = 
+\frac{1}{2} \sum_{i=1}^{N-n} (x'_i - z)^2 +
+\frac{1}{2} \sum_{i=1}^{n} (x_i + \pi - z)^2
+\qquad \text{ for } x_{n} + \pi/2 \leq z \leq \pi/2.$$
+
+
+Now that we have an expression for the quadratic function on each of the piecewise intervals, let's find the minimum on those intervals. The minimum will be either attained in the interior with zero gradient, or it will be attained on one of its endpoints. 
+The latter is a straightforward function evaluation. 
+For the former, differentiating $\Phi$ and setting to zero gives the minimum of the quadratic function, $z^\ast$, which must then be checked whether it lies in the interior of the corresponding interval. The formula for $z^\ast$ is
+
+$$ z^\ast = \frac{1}{N} \sum_{i=1}^{N} x_i - \frac{M\pi}{N} $$
+
+where 
+
+\begin{equation}
+M =
+\begin{cases}
+N-n, &\ \text{ for the interval } (-\pi/2, x'_1-\pi/2) \\
+N-n-k+1, &\ \text{ for the interval } (x'_{k-1} - \pi/2, x'_{k} - \pi/2),\ k = 2, \dots, N-n\\
+0, &\ \text{ for the interval } (x'_{N-n}-\pi/2, x_1+\pi/2) \\
+-(k-1), &\ \text{ for the interval } (x_{k-1}+\pi/2, x_{k}+\pi/2),\ k = 2, \dots, n\\
+-n, &\ \text{ for the interval } (x_{n}+\pi/2, \pi/2)
+\end{cases} 
+.
+\end{equation}
+
+
+## Implementing the `periodic_mean` Function
+
+The following code implements the periodic mean computation.
+
+
+```{r}
+periodic_mean <- function(data, dom = pi/2) {
+    data <- sort(data)
+    
+    N = length(data)
+    n = which(data > 0)[1] - 1
+    
+    breakpoints = c(-dom, data[(n+1):N] - dom, data[1:n] + dom, dom)
+    mu0 = mean(data)
+    
+    ## Helper functions
+    dsq = function(x,y) {(x - y)^2}
+    
+    # L2 Minimization Objective
+    # Argument k indicates which interval's quadratic function to compute (useful for checking continuity across breakpoints). Using the default corresponds to the miminization objective above.
+    # Variables from enclosing envir: data, dom, N, n, breakpoints
+    Phi = function(z, k = which(z<=breakpoints)[1]-1) {
+        if (k==1) {
+            0.5 * (  sum( dsq( data[(n+1) : N] - 2*dom , z ) ) + 
+                     sum( dsq( data[   1  : n]         , z ) )    )
+        } else if (k <= N-n) {
+            0.5 * (  sum( dsq( data[(n+1) : (n+k-1)]         , z ) ) + 
+                     sum( dsq( data[(n+k) :      N ] - 2*dom , z ) ) +
+                     sum( dsq( data[   1  :      n ]         , z ) )    )
+        } else if (k == N - n + 1) {
+            0.5 * (  sum( dsq( data , z ) )  )
+        } else if (k <= N) {
+            0.5 * (  sum( dsq( data[  (n+1) :      N   ]         , z ) ) + 
+                     sum( dsq( data[     1  : (k-1-N+n)] + 2*dom , z ) ) +
+                     sum( dsq( data[(k-N+n) :      n   ]         , z ) )    )
+        } else {
+            0.5 * (  sum( dsq( data[(n+1) : N]         , z ) ) + 
+                     sum( dsq( data[   1  : n] + 2*dom , z ) )    )
+        }
+    }
+
+    ## Minimize
+    bestz = breakpoints[1]
+    bestphi = Phi(bestz, 1)
+    
+    for (k in 1:(N+1)) {
+        zs = breakpoints[k:(k+1)]
+        zstar = mu0 - pi * (N-n-(k-1)) / N
+        if (zstar < breakpoints[k+1] & zstar > breakpoints[k])
+            zs = c(zs, zstar)
+        
+        phis = sapply(zs, Phi, k = k)
+        
+        p = which.min(phis)
+        if (phis[p] < bestphi) {
+            bestz = zs[p]
+            bestphi = phis[p]
+        }
+    }
+    
+    return(bestz)
+}
+```
+
+Let's test the `periodic_mean` function on some generated data. We randomly generate 2-dimensional Normal data centered at $(\pi/2, \pi/2)$, and then take it modulo $\pi$ to put it onto the periodic domain. For testing purposes, we choose the standard deviation small enough so that, intuitively, the mean of the periodic data equals the mean of the original Normal data modulo $\pi$.
+
+```{r}
+dom = pi/2 # Domain half size
+N = 50     # Number of data points
+
+# Generate data
+set.seed(42)
+x = matrix(rnorm(2*N, mean = dom, sd = dom/4), nrow=N)
+
+# Put data onto periodic domain
+data = ((x+dom) %% (2*dom)) - dom 
+data[data == -dom] = dom   # Use the convention (-dom, dom], instead of [-dom, dom)
+
+# With small enough standard deviation, mu_original and mu_target are equivalent modulo pi
+mu_original = colMeans(x)
+mu_target = ((mu_original+dom) %% (2*dom)) - dom
+```
+
+The following figure illustrates the generated data and the periodic vs non-periodic mean. The original Normal data (blue circles) and the periodic data modulo $\pi$ (red triangles) should intuitively have the same mean modulo $\pi$ (dark blue solid dots, which are equivalent mod $\pi$). Ignoring the periodicity of the data when computing the mean leads to the dark red solid triangle.
+
+```{r, echo=F}
+# Plot data
+par(pty='s')
+plot(x, xlim = c(-dom, max(x)), ylim = c(-dom, max(x)), col="blue", pch=1, asp=1,
+     xlab = "x_1", ylab = "x_2")
+points(mu_original[1], mu_original[2], col="darkblue", pch=19)
+points(mu_target[1], mu_target[2], col="darkblue", pch=19)
+points(data, col='red', pch=2)
+points(mean(data[,1]), mean(data[,2]), col="darkred", pch=17)
+lines(c(-dom, -dom, dom, dom, -dom), c(-dom, dom, dom, -dom, -dom), col="gray80")
+```
+
+We now test that the `periodic_mean` function finds the correct mean.
+
+```{r}
+mu_per = apply(data, 2, periodic_mean)
+mu_per
+mu_target
+```
+
+Check!
+
+
+## Standard Deviation of Periodic Data
+
+Once the mean of periodic data is found, the standard deviation is a standard computation,
+
+$$ \sigma_{per}^2 = \frac{1}{N-1} \sum_{i=1}^N d(x_i, \mu_{per})^2$$
+
+where $d$ is the periodic distance.
+
+The periodic SD is implemented as follows.
+
+```{r}
+periodic_distance <- function(x, y, dom=pi/2) {
+    pmin(abs(x-y), abs(x + 2*dom - y), abs(x - 2*dom - y))
+}
+
+periodic_sd <- function(data, dom=pi/2) {
+    mu = periodic_mean(data, dom=dom)
+    sigma = sqrt( sum(periodic_distance(mu, data, dom)^2) / (length(data)-1) )
+}
+```
+
+We can easily check that the periodic standard deviation matches the standard deviation of the original Normal data for our test data. 
+
+```{r}
+sd_per = apply(data, 2, periodic_sd)
+sd_per
+
+sd_target = apply(x, 2, sd)
+sd_target
+```
+
+Needless to say, it should be no surprise that ignoring the periodicity of the data when taking the standard deviation leads to an artificially inflated standard deviation.
+
+```{r}
+sd_nonper = apply(data, 2, sd)
+sd_nonper
+```
+
+$\square$
